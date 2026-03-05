@@ -9,6 +9,7 @@ struct Task {
     QDateTime deadline;
     int priority = 0; // 0-3
     bool isCompleted = false;
+    QDateTime createdDate; // When the task was created
 };
 
 /* Task layout in SQLite
@@ -19,6 +20,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     description TEXT,
     deadline DATETIME,
     priority INTEGER DEFAULT 0,  -- 0=None, 1=Urgent, 2=Important, 3=Both
-    is_completed BOOLEAN DEFAULT 0
+    is_completed BOOLEAN DEFAULT 0,
+    created_date DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 */

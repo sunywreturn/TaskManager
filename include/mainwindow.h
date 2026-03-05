@@ -60,6 +60,11 @@ private slots:
     void exportDatabase();
     void importDatabase();
 
+    // Search functionality
+    void showSearchDialog();
+    void performAdvancedSearch();
+    void clearSearchResults();
+
 private:
     void setupUI();
     void setupDatabase();
@@ -141,6 +146,23 @@ private:
     QPushButton* saveAsTemplateButton;
     QPushButton* manageTemplatesButton;
 
+    // Search components
+    QAction* searchAction;
+    QTableView* searchResultsView;
+    QStandardItemModel* searchResultsModel;
+    QTextEdit* searchDetailsView;
+    QLineEdit* searchTitleEdit;
+    QLineEdit* searchDescriptionEdit;
+    QComboBox* searchPriorityCombo;
+    QCheckBox* searchCompletedCheckbox;
+    QCheckBox* searchPendingCheckbox;
+    QDateEdit* searchStartDateEdit;
+    QDateEdit* searchEndDateEdit;
+    QPushButton* searchButton;
+    QPushButton* clearSearchButton;
+    QLabel* searchResultsLabel;
+
+    void setupSearchTab(QWidget* searchTab);
     void showTaskDetailsDialog(const Task& task);
     void showTodoItemDetailsDialog(const TODOItem& item);
 

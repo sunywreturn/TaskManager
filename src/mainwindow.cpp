@@ -28,6 +28,7 @@
 #include <QSpinBox>
 #include <QCheckBox>
 #include <QMap>
+#include <QRegularExpression>
 #include "calendardelegate.h"
 #include <QListWidget>
 #include <QListWidgetItem>
@@ -75,6 +76,13 @@ void MainWindow::setupUI() {
     fileMenu->addAction(exportAction);
     fileMenu->addAction(importAction);
 
+    // Add Search menu and action
+    QMenu* searchMenu = menuBar->addMenu("Search");
+    searchAction = new QAction("Advanced Search...", this);
+    searchAction->setShortcut(QKeySequence::Find);
+    searchAction->setToolTip("Search tasks with advanced filters");
+    searchMenu->addAction(searchAction);
+
     qApp->setStyleSheet(
         "QDialog {"
         "   background-color: #f8f8f8;"
@@ -106,6 +114,11 @@ void MainWindow::setupUI() {
     mainTabs->addTab(todoTab, "Plan");
     mainTabs->addTab(todayTab, "Today");
     setupTodayTab();
+
+    // Add Search tab
+    QWidget* searchTab = new QWidget;
+    setupSearchTab(searchTab);
+    mainTabs->addTab(searchTab, "Search");
 
     // Task Tab - Existing UI
     QWidget* taskTabContent = new QWidget(taskTab);
@@ -498,6 +511,7 @@ void MainWindow::setupConnections() {
     connect(restoreAction, &QAction::triggered, this, &MainWindow::restoreDatabase);
     connect(exportAction, &QAction::triggered, this, &MainWindow::exportDatabase);
     connect(importAction, &QAction::triggered, this, &MainWindow::importDatabase);
+    connect(searchAction, &QAction::triggered, this, &MainWindow::showSearchDialog);
 }
 
 void MainWindow::applyTableStyling() {
@@ -782,17 +796,17 @@ void MainWindow::showTaskDetails(const QModelIndex &index) {
 
 void MainWindow::filterTasks() {
     QString searchText = searchBox->text().toLower();   
-    proxyModel->setFilterRegExp(QRegExp(searchText, Qt::CaseInsensitive, QRegExp::FixedString));
+    proxyModel->setFilterRegularExpression(QRegularExpression(searchText, QRegularExpression::CaseInsensitiveOption));
     refreshAllViews();
 }
 
 void MainWindow::updatePriorityFilter(int index) {
     if (index == 0) { // "All Priorities"
-        proxyModel->setFilterRegExp("");
+        proxyModel->setFilterRegularExpression(QRegularExpression());
     } else {
-        proxyModel->setFilterRegExp(QRegExp(priorityNames.at(index-1), 
-                                          Qt::CaseInsensitive, 
-                                          QRegExp::FixedString));
+        proxyModel->setFilterRegularExpression(QRegularExpression(
+            QRegularExpression::escape(priorityNames.at(index-1)), 
+            QRegularExpression::CaseInsensitiveOption));
     }
     refreshAllViews();
 }
@@ -1865,6 +1879,11 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
                 editTODOItem();
                 return true;
             }
+            // Search tab - trigger search on Enter
+            else if (obj == searchTitleEdit || obj == searchDescriptionEdit) {
+                performAdvancedSearch();
+                return true;
+            }
         }
     }
     return QMainWindow::eventFilter(obj, event);
@@ -1942,4 +1961,276 @@ void MainWindow::importDatabase() {
     } else {
         QMessageBox::warning(this, "Error", "Failed to import database");
     }
+}
+void MainWindow::setupSearchTab(QWidget* searchTab) {
+    QVBoxLayout* searchLayout = new QVBoxLayout(searchTab);
+    searchLayout->setSpacing(10);
+
+    // Search criteria panel
+    QGroupBox* criteriaGroup = new QGroupBox("Search Criteria", searchTab);
+    QFormLayout* criteriaLayout = new QFormLayout(criteriaGroup);
+
+    // Title search
+    searchTitleEdit = new QLineEdit;
+    searchTitleEdit->setPlaceholderText("Enter keywords in title...");
+    criteriaLayout->addRow("Title:", searchTitleEdit);
+
+    // Description search
+    searchDescriptionEdit = new QLineEdit;
+    searchDescriptionEdit->setPlaceholderText("Enter keywords in description...");
+    criteriaLayout->addRow("Description:", searchDescriptionEdit);
+
+    // Priority filter
+    searchPriorityCombo = new QComboBox;
+    searchPriorityCombo->addItems(QStringList() << "All Priorities" << priorityNames);
+    criteriaLayout->addRow("Priority:", searchPriorityCombo);
+
+    // Status filters
+    QHBoxLayout* statusLayout = new QHBoxLayout;
+    searchCompletedCheckbox = new QCheckBox("Completed");
+    searchPendingCheckbox = new QCheckBox("Pending");
+    searchPendingCheckbox->setChecked(true); // Default to show pending tasks
+    statusLayout->addWidget(searchCompletedCheckbox);
+    statusLayout->addWidget(searchPendingCheckbox);
+    statusLayout->addStretch();
+    criteriaLayout->addRow("Status:", statusLayout);
+
+    // Date range
+    QHBoxLayout* dateLayout = new QHBoxLayout;
+    searchStartDateEdit = new QDateEdit;
+    searchStartDateEdit->setCalendarPopup(true);
+    searchStartDateEdit->setDate(QDate::currentDate().addDays(-30)); // Default to last 30 days
+    searchEndDateEdit = new QDateEdit;
+    searchEndDateEdit->setCalendarPopup(true);
+    searchEndDateEdit->setDate(QDate::currentDate().addDays(30)); // Default to next 30 days
+    dateLayout->addWidget(new QLabel("From:"));
+    dateLayout->addWidget(searchStartDateEdit);
+    dateLayout->addWidget(new QLabel("To:"));
+    dateLayout->addWidget(searchEndDateEdit);
+    dateLayout->addStretch();
+    criteriaLayout->addRow("Date Range:", dateLayout);
+
+    // Search buttons
+    QHBoxLayout* buttonLayout = new QHBoxLayout;
+    searchButton = new QPushButton("Search");
+    searchButton->setIcon(QIcon(":/icons/search.png"));
+    clearSearchButton = new QPushButton("Clear");
+    clearSearchButton->setIcon(QIcon(":/icons/clear.png"));
+    buttonLayout->addWidget(searchButton);
+    buttonLayout->addWidget(clearSearchButton);
+    buttonLayout->addStretch();
+    criteriaLayout->addRow("", buttonLayout);
+
+    searchLayout->addWidget(criteriaGroup);
+
+    // Results label
+    searchResultsLabel = new QLabel("Enter search criteria and click Search", searchTab);
+    searchResultsLabel->setStyleSheet("font-weight: bold; color: #2c3e50;");
+    searchLayout->addWidget(searchResultsLabel);
+
+    // Results area with splitter
+    QSplitter* resultsSplitter = new QSplitter(Qt::Horizontal, searchTab);
+
+    // Search results table
+    QWidget* resultsPanel = new QWidget(resultsSplitter);
+    QVBoxLayout* resultsPanelLayout = new QVBoxLayout(resultsPanel);
+
+    searchResultsView = new QTableView(resultsPanel);
+    searchResultsModel = new QStandardItemModel(0, 5, this);
+    searchResultsModel->setHorizontalHeaderLabels({"Title", "Priority", "Status", "Deadline", "Date Created"});
+    searchResultsView->setModel(searchResultsModel);
+    searchResultsView->setSelectionBehavior(QAbstractItemView::SelectRows);
+    searchResultsView->setSelectionMode(QAbstractItemView::SingleSelection);
+    searchResultsView->setSortingEnabled(true);
+
+    // Configure results table
+    searchResultsView->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    searchResultsView->setColumnWidth(1, 100);
+    searchResultsView->setColumnWidth(2, 100);
+    searchResultsView->setColumnWidth(3, 150);
+    searchResultsView->setColumnWidth(4, 150);
+
+    // Add styling
+    searchResultsView->setStyleSheet(
+        "QTableView { background-color: white; border: 1px solid #d0d0d0; border-radius: 4px; }"
+        "QTableView::item { padding: 4px; }"
+        "QTableView::item:selected { background-color: #e0e0ff; color: black; }"
+    );
+
+    resultsPanelLayout->addWidget(searchResultsView);
+
+    // Task details panel
+    QWidget* detailsPanel = new QWidget(resultsSplitter);
+    QVBoxLayout* detailsPanelLayout = new QVBoxLayout(detailsPanel);
+
+    QGroupBox* detailsGroup = new QGroupBox("Task Details", detailsPanel);
+    QVBoxLayout* detailsGroupLayout = new QVBoxLayout(detailsGroup);
+
+    searchDetailsView = new QTextEdit(detailsGroup);
+    searchDetailsView->setReadOnly(true);
+    searchDetailsView->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    detailsGroupLayout->addWidget(searchDetailsView);
+
+    detailsPanelLayout->addWidget(detailsGroup);
+
+    resultsSplitter->addWidget(resultsPanel);
+    resultsSplitter->addWidget(detailsPanel);
+    resultsSplitter->setSizes({600, 300});
+
+    searchLayout->addWidget(resultsSplitter, 1); // Take available space
+
+    // Connect signals
+    connect(searchButton, &QPushButton::clicked, this, &MainWindow::performAdvancedSearch);
+    connect(clearSearchButton, &QPushButton::clicked, this, &MainWindow::clearSearchResults);
+    connect(searchResultsView->selectionModel(), &QItemSelectionModel::currentChanged,
+            this, [this](const QModelIndex &current) {
+                if (!current.isValid()) {
+                    searchDetailsView->clear();
+                    return;
+                }
+
+                int row = current.row();
+                QStandardItem* idItem = searchResultsModel->item(row, 0);
+                int taskId = idItem->data().toInt();
+
+                QVector<Task> allTasks = Database::getAllTasks();
+                for (const Task& task : allTasks) {
+                    if (task.id == taskId) {
+                        QString details = QString("<h2>%1</h2>"
+                                            "<p><b>Status:</b> %2</p>"
+                                            "<p><b>Priority:</b> %3</p>"
+                                            "<p><b>Deadline:</b> %4</p>"
+                                            "<p><b>Created:</b> %5</p>"
+                                            "<hr><p>%6</p>")
+                                        .arg(task.title)
+                                        .arg(task.isCompleted ? "Completed" : "Pending")
+                                        .arg(priorityNames.value(task.priority, "None"))
+                                        .arg(task.deadline.toString("dd/MM/yyyy hh:mm"))
+                                        .arg(task.createdDate.toString("dd/MM/yyyy hh:mm"))
+                                        .arg(formatDescription(task.description));
+
+                        searchDetailsView->setHtml(details);
+                        break;
+                    }
+                }
+            });
+
+    // Add Enter key support for search fields
+    searchTitleEdit->installEventFilter(this);
+    searchDescriptionEdit->installEventFilter(this);
+}
+
+void MainWindow::showSearchDialog() {
+    mainTabs->setCurrentIndex(mainTabs->count() - 1); // Switch to search tab
+}
+
+void MainWindow::performAdvancedSearch() {
+    // Clear previous results
+    searchResultsModel->removeRows(0, searchResultsModel->rowCount());
+
+    // Get search criteria
+    QString titleSearch = searchTitleEdit->text().trimmed();
+    QString descriptionSearch = searchDescriptionEdit->text().trimmed();
+    int priorityFilter = searchPriorityCombo->currentIndex() - 1; // -1 for "All Priorities"
+    bool showCompleted = searchCompletedCheckbox->isChecked();
+    bool showPending = searchPendingCheckbox->isChecked();
+    QDate startDate = searchStartDateEdit->date();
+    QDate endDate = searchEndDateEdit->date();
+
+    // Get all tasks and filter
+    QVector<Task> allTasks = Database::getAllTasks();
+    QVector<Task> filteredTasks;
+
+    for (const Task& task : allTasks) {
+        // Title filter
+        if (!titleSearch.isEmpty() && !task.title.contains(titleSearch, Qt::CaseInsensitive)) {
+            continue;
+        }
+
+        // Description filter
+        if (!descriptionSearch.isEmpty() && !task.description.contains(descriptionSearch, Qt::CaseInsensitive)) {
+            continue;
+        }
+
+        // Priority filter
+        if (priorityFilter >= 0 && task.priority != priorityFilter) {
+            continue;
+        }
+
+        // Status filter
+        if (task.isCompleted && !showCompleted) continue;
+        if (!task.isCompleted && !showPending) continue;
+
+        // Date range filter
+        QDate taskDate = task.deadline.date();
+        if (taskDate < startDate || taskDate > endDate) {
+            continue;
+        }
+
+        filteredTasks.append(task);
+    }
+
+    // Populate results table
+    for (const Task& task : filteredTasks) {
+        QList<QStandardItem*> rowItems;
+
+        // Title with ID stored
+        QStandardItem* titleItem = new QStandardItem(task.title);
+        titleItem->setData(task.id);
+        if (task.isCompleted) {
+            QFont font = titleItem->font();
+            font.setStrikeOut(true);
+            titleItem->setFont(font);
+            titleItem->setForeground(QBrush(Qt::gray));
+        }
+        rowItems << titleItem;
+
+        // Priority
+        QStandardItem* priorityItem = new QStandardItem(priorityNames.value(task.priority, "None"));
+        switch (task.priority) {
+            case 1: priorityItem->setForeground(QBrush(Qt::red)); break;
+            case 2: priorityItem->setForeground(QBrush(QColor(255, 165, 0))); break;
+            case 3: priorityItem->setForeground(QBrush(Qt::darkRed)); break;
+        }
+        rowItems << priorityItem;
+
+        // Status
+        QString status = task.isCompleted ? "Completed" : "Pending";
+        if (!task.isCompleted && task.deadline < QDateTime::currentDateTime()) {
+            status = "Overdue";
+        }
+        QStandardItem* statusItem = new QStandardItem(status);
+        if (status == "Overdue") statusItem->setForeground(QBrush(Qt::red));
+        rowItems << statusItem;
+
+        // Deadline
+        rowItems << new QStandardItem(task.deadline.toString("dd/MM/yyyy hh:mm"));
+
+        // Created date (assuming it exists in Task struct)
+        rowItems << new QStandardItem(task.createdDate.toString("dd/MM/yyyy hh:mm"));
+
+        searchResultsModel->appendRow(rowItems);
+    }
+
+    // Update results label
+    searchResultsLabel->setText(QString("Found %1 tasks matching your criteria").arg(filteredTasks.size()));
+
+    // Sort by deadline by default
+    searchResultsView->sortByColumn(3, Qt::AscendingOrder);
+}
+
+void MainWindow::clearSearchResults() {
+    // Clear search fields
+    searchTitleEdit->clear();
+    searchDescriptionEdit->clear();
+    searchPriorityCombo->setCurrentIndex(0);
+    searchCompletedCheckbox->setChecked(false);
+    searchPendingCheckbox->setChecked(true);
+    searchStartDateEdit->setDate(QDate::currentDate().addDays(-30));
+    searchEndDateEdit->setDate(QDate::currentDate().addDays(30));
+
+    // Clear results
+    searchResultsModel->removeRows(0, searchResultsModel->rowCount());
+    searchDetailsView->clear();
+    searchResultsLabel->setText("Enter search criteria and click Search");
 }

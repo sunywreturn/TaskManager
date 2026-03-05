@@ -1,6 +1,30 @@
 {
     "configurations": [
         {
+            "name": "Win32-Qt6",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "C:/Qt/6.10.2/mingw_64/include",
+                "C:/Qt/6.10.2/mingw_64/include/QtCore",
+                "C:/Qt/6.10.2/mingw_64/include/QtSql",
+                "C:/Qt/6.10.2/mingw_64/include/QtWidgets",
+                "C:/Qt/6.10.2/mingw_64/include/QtGui"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE",
+                "QT_CORE_LIB",
+                "QT_GUI_LIB",
+                "QT_SQL_LIB",
+                "QT_WIDGETS_LIB"
+            ],
+            "compilerPath": "C:/Qt/Tools/mingw1310_64/bin/g++.exe",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "windows-gcc-x64"
+        },
+        {
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",

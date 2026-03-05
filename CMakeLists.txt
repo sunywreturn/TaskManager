@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(TaskManager)
 
-# Find Qt packages
-find_package(Qt5 REQUIRED COMPONENTS Core Sql Widgets)
+# Find Qt6 packages
+find_package(Qt6 REQUIRED COMPONENTS Core Sql Widgets)
 
 # Enable automatic moc, uic, and rcc
 set(CMAKE_AUTOMOC ON)
@@ -26,11 +26,11 @@ add_executable(TaskManager
     ${RESOURCE_FILES}
 )
 
-# Link Qt modules
+# Link Qt6 modules
 target_link_libraries(TaskManager
-    Qt5::Core
-    Qt5::Sql
-    Qt5::Widgets
+    Qt6::Core
+    Qt6::Sql
+    Qt6::Widgets
 )
 
 install(CODE "

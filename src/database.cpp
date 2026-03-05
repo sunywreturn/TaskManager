@@ -46,7 +46,8 @@ bool Database::initialize() {
         "description TEXT,"
         "deadline DATETIME,"
         "priority INTEGER DEFAULT 0,"
-        "is_completed BOOLEAN DEFAULT 0)"
+        "is_completed BOOLEAN DEFAULT 0,"
+        "created_date DATETIME DEFAULT CURRENT_TIMESTAMP)"
     ) && query.exec(
         "CREATE TABLE IF NOT EXISTS todo_lists ("
         "id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -87,14 +88,15 @@ bool Database::createTask(Task& task) {
     QSqlQuery query;
     query.prepare(
         "INSERT INTO tasks ("
-        "title, description, deadline, priority, is_completed"
-        ") VALUES (?, ?, ?, ?, ?)"
+        "title, description, deadline, priority, is_completed, created_date"
+        ") VALUES (?, ?, ?, ?, ?, ?)"
     );
     query.addBindValue(task.title);
     query.addBindValue(task.description);
     query.addBindValue(task.deadline);
     query.addBindValue(task.priority);
     query.addBindValue(task.isCompleted);
+    query.addBindValue(QDateTime::currentDateTime()); // Set creation time
 
     if (!query.exec()) {
         qWarning() << "createTask failed:" << query.lastError().text();
@@ -102,6 +104,7 @@ bool Database::createTask(Task& task) {
     }
 
     task.id = query.lastInsertId().toInt();
+    task.createdDate = QDateTime::currentDateTime(); // Also set in struct
     return true;
 }
 
@@ -159,6 +162,7 @@ QVector<Task> Database::getAllTasks() {
         task.deadline = query.value("deadline").toDateTime();
         task.priority = query.value("priority").toInt();
         task.isCompleted = query.value("is_completed").toBool();
+        task.createdDate = query.value("created_date").toDateTime();
         tasks.append(task);
     }
     return tasks;
@@ -465,7 +469,7 @@ bool Database::exportToSQL(const QString& filePath) {
                 QVariant value = query.value(i);
                 if (value.isNull()) {
                     values << "NULL";
-                } else if (value.type() == QVariant::String) {
+                } else if (value.metaType().id() == QMetaType::QString) {
                     values << "'" + value.toString().replace("'", "''") + "'";
                 } else {
                     values << value.toString();
