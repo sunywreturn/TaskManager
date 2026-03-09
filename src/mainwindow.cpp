@@ -781,18 +781,18 @@ void MainWindow::showTaskDetails(const QModelIndex &index) {
 }
 
 void MainWindow::filterTasks() {
-    QString searchText = searchBox->text().toLower();   
-    proxyModel->setFilterRegExp(QRegExp(searchText, Qt::CaseInsensitive, QRegExp::FixedString));
+    QString searchText = searchBox->text();   
+    QRegularExpression regex(searchText, QRegularExpression::CaseInsensitiveOption);
+    proxyModel->setFilterRegularExpression(regex);
     refreshAllViews();
 }
 
 void MainWindow::updatePriorityFilter(int index) {
     if (index == 0) { // "All Priorities"
-        proxyModel->setFilterRegExp("");
+        proxyModel->setFilterRegularExpression(QRegularExpression());
     } else {
-        proxyModel->setFilterRegExp(QRegExp(priorityNames.at(index-1), 
-                                          Qt::CaseInsensitive, 
-                                          QRegExp::FixedString));
+        QRegularExpression regex(priorityNames.at(index-1), QRegularExpression::CaseInsensitiveOption);
+        proxyModel->setFilterRegularExpression(regex);
     }
     refreshAllViews();
 }
