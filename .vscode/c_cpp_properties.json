@@ -2,13 +2,16 @@
     "configurations": [
         {
             "name": "Win32-Qt6",
+            "compileCommands": "${workspaceFolder}/cmake-build-debug/compile_commands.json",
             "includePath": [
                 "${workspaceFolder}/**",
                 "C:/Qt/6.10.2/mingw_64/include",
                 "C:/Qt/6.10.2/mingw_64/include/QtCore",
                 "C:/Qt/6.10.2/mingw_64/include/QtSql",
                 "C:/Qt/6.10.2/mingw_64/include/QtWidgets",
-                "C:/Qt/6.10.2/mingw_64/include/QtGui"
+                "C:/Qt/6.10.2/mingw_64/include/QtGui",
+                "C:/Qt/6.10.2/mingw_64/mkspecs/win32-g++",
+                "${workspaceFolder}/cmake-build-debug/TaskManager_autogen/include"
             ],
             "defines": [
                 "_DEBUG",
@@ -17,7 +20,12 @@
                 "QT_CORE_LIB",
                 "QT_GUI_LIB",
                 "QT_SQL_LIB",
-                "QT_WIDGETS_LIB"
+                "QT_WIDGETS_LIB",
+                "MINGW_HAS_SECURE_API=1",
+                "WIN32",
+                "WIN64",
+                "_WIN64",
+                "_ENABLE_EXTENDED_ALIGNED_STORAGE"
             ],
             "compilerPath": "C:/Qt/Tools/mingw1310_64/bin/g++.exe",
             "cStandard": "c17",
